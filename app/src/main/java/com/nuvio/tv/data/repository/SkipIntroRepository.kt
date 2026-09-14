@@ -4,6 +4,7 @@ import android.util.Log
 import com.nuvio.tv.BuildConfig
 import com.nuvio.tv.core.tmdb.TmdbService
 import com.nuvio.tv.data.local.AnimeSkipSettingsDataStore
+import com.nuvio.tv.data.local.PlayerSettingsDataStore
 import com.nuvio.tv.data.remote.api.AniSkipApi
 import com.nuvio.tv.data.remote.api.AnimeSkipApi
 import com.nuvio.tv.data.remote.api.AnimeSkipRequest
@@ -19,6 +20,7 @@ import kotlinx.coroutines.async
 import kotlinx.coroutines.CancellationException
 import kotlinx.coroutines.coroutineScope
 import kotlinx.coroutines.flow.firstOrNull
+import kotlinx.coroutines.flow.first
 
 data class SkipInterval(
     val startTime: Double, // seconds
@@ -59,7 +61,8 @@ class SkipIntroRepository @Inject constructor(
     private val animeSkipApi: AnimeSkipApi,
     private val simklResolver: SimklIdResolver,
     private val animeSkipSettingsDataStore: AnimeSkipSettingsDataStore,
-    private val tmdbService: TmdbService
+    private val tmdbService: TmdbService,
+    private val playerSettingsDataStore: PlayerSettingsDataStore
 ) {
     private val cache = ConcurrentHashMap<String, List<SkipInterval>>()
     private val animeSkipShowIdCache = ConcurrentHashMap<String, String>()
@@ -89,7 +92,8 @@ class SkipIntroRepository @Inject constructor(
      */
     suspend fun getSkipIntervals(imdbId: String?, season: Int, episode: Int): List<SkipInterval> = coroutineScope {
         if (imdbId == null) return@coroutineScope emptyList()
-        val cacheKey = "$imdbId:$season:$episode"
+        val aniSkipEnabled = playerSettingsDataStore.playerSettings.first().aniSkipEnabled
+        val cacheKey = "$imdbId:$season:$episode:aniskip=$aniSkipEnabled"
         cache[cacheKey]?.let { return@coroutineScope it }
 
         val introDbDeferred = async {
@@ -112,7 +116,7 @@ class SkipIntroRepository @Inject constructor(
         } else episode
 
         val aniSkipDeferred = async {
-            if (malId != null) fetchFromAniSkip(malId, animeEpisode) else emptyList()
+            if (aniSkipEnabled && malId != null) fetchFromAniSkip(malId, animeEpisode) else emptyList()
         }
         val animeSkipDeferred = async {
             if (anilistId != null) fetchFromAnimeSkip(anilistId, animeEpisode, season = null) else emptyList()
@@ -132,10 +136,13 @@ class SkipIntroRepository @Inject constructor(
         imdbSeason: Int? = null,
         imdbEpisode: Int? = null
     ): List<SkipInterval> = coroutineScope {
-        val cacheKey = "mal:$malId:$episode"
+        val aniSkipEnabled = playerSettingsDataStore.playerSettings.first().aniSkipEnabled
+        val cacheKey = "mal:$malId:$episode:aniskip=$aniSkipEnabled"
         cache[cacheKey]?.let { return@coroutineScope it }
 
-        val aniSkipDeferred = async { fetchFromAniSkip(malId, episode) }
+        val aniSkipDeferred = async {
+            if (aniSkipEnabled) fetchFromAniSkip(malId, episode) else emptyList()
+        }
 
         val simklIdsDeferred = async { simklResolver.resolveIds("mal", malId) }
         val simklIds = simklIdsDeferred.await()
@@ -174,7 +181,8 @@ class SkipIntroRepository @Inject constructor(
         imdbSeason: Int? = null,
         imdbEpisode: Int? = null
     ): List<SkipInterval> = coroutineScope {
-        val cacheKey = "kitsu:$kitsuId:$episode"
+        val aniSkipEnabled = playerSettingsDataStore.playerSettings.first().aniSkipEnabled
+        val cacheKey = "kitsu:$kitsuId:$episode:aniskip=$aniSkipEnabled"
         cache[cacheKey]?.let { return@coroutineScope it }
 
         // Resolve all IDs via Simkl
@@ -184,7 +192,7 @@ class SkipIntroRepository @Inject constructor(
         val resolvedImdbId = imdbId ?: simklIds?.imdb
 
         val aniSkipDeferred = async {
-            if (malIdStr != null) fetchFromAniSkip(malIdStr, episode) else emptyList()
+            if (aniSkipEnabled && malIdStr != null) fetchFromAniSkip(malIdStr, episode) else emptyList()
         }
 
         val tvdbDeferred = async {

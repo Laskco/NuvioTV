@@ -88,6 +88,12 @@ internal fun PlaybackSkipSegmentsSection(
         onToggle = { onUpdate { setSkipIntroEnabled(!settings.skipIntroEnabled) } },
         enabled = internalPlayer
     )
+    SettingsToggleRow(
+        title = stringResource(R.string.playback_aniskip),
+        subtitle = stringResource(R.string.playback_aniskip_sub),
+        checked = settings.aniSkipEnabled,
+        onToggle = { onUpdate { setAniSkipEnabled(!settings.aniSkipEnabled) } }
+    )
 
     SettingsSectionLabel(
         text = stringResource(R.string.playback_auto_skip_segments),

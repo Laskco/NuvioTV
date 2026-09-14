@@ -148,6 +148,7 @@ internal fun PlaybackSettingsSections(
     onSetPauseOverlayEnabled: (Boolean) -> Unit,
     onSetOsdClockEnabled: (Boolean) -> Unit,
     onSetSkipIntroEnabled: (Boolean) -> Unit,
+    onSetAniSkipEnabled: (Boolean) -> Unit,
     onSetParentalGuideEnabled: (Boolean) -> Unit,
     onSetAutoSkipSegmentTypeEnabled: (AutoSkipSegmentType, Boolean) -> Unit,
     onSetFrameRateMatchingMode: (FrameRateMatchingMode) -> Unit,
@@ -386,6 +387,17 @@ internal fun PlaybackSettingsSections(
                     onCheckedChange = onSetSkipIntroEnabled,
                     onFocused = { focusedSection = PlaybackSection.GENERAL },
                     enabled = !generalUi.isExternalPlayer
+                )
+            }
+
+            item(key = "general_aniskip") {
+                ToggleSettingsItem(
+                    icon = Icons.Default.History,
+                    title = stringResource(R.string.playback_aniskip),
+                    subtitle = stringResource(R.string.playback_aniskip_sub),
+                    isChecked = playerSettings.aniSkipEnabled,
+                    onCheckedChange = onSetAniSkipEnabled,
+                    onFocused = { focusedSection = PlaybackSection.GENERAL }
                 )
             }
 

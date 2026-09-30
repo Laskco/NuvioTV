@@ -25,6 +25,7 @@ import com.nuvio.tv.domain.model.DetailImdbRatingsVisibility
 import com.nuvio.tv.domain.model.EpisodeOptionsOverlayStyle
 import com.nuvio.tv.domain.model.FocusedPosterTrailerPlaybackTarget
 import com.nuvio.tv.domain.model.HomeLayout
+import com.nuvio.tv.domain.model.UiScale
 import com.nuvio.tv.domain.model.HomeImdbRatingsVisibility
 import com.nuvio.tv.domain.model.enabledAddons
 import com.nuvio.tv.domain.repository.AddonRepository
@@ -40,6 +41,7 @@ import kotlinx.coroutines.launch
 import javax.inject.Inject
 
 data class LayoutSettingsUiState(
+    val uiScalePercent: Int = UiScale.DEFAULT_PERCENT,
     val selectedLayout: HomeLayout = HomeLayout.MODERN,
     val hasChosen: Boolean = false,
     val availableCatalogs: List<CatalogInfo> = emptyList(),
@@ -97,6 +99,7 @@ data class CatalogInfo(
 )
 
 sealed class LayoutSettingsEvent {
+    data class SetUiScalePercent(val percent: Int) : LayoutSettingsEvent()
     data class SelectLayout(val layout: HomeLayout) : LayoutSettingsEvent()
     data class ToggleHeroCatalog(val catalogKey: String) : LayoutSettingsEvent()
     data class SetSidebarCollapsed(val collapsed: Boolean) : LayoutSettingsEvent()
@@ -186,6 +189,11 @@ class LayoutSettingsViewModel @Inject constructor(
 
     init {
         loadLogoBytes()
+        viewModelScope.launch {
+            layoutPreferenceDataStore.uiScalePercent.distinctUntilChanged().collectLatest { percent ->
+                updateUiStateIfChanged { it.copy(uiScalePercent = percent) }
+            }
+        }
         viewModelScope.launch {
             streamBadgeSettingsDataStore.settings.collectLatest { settings ->
                 _streamBadgeUiState.update { it.copy(settings = settings) }
@@ -433,6 +441,9 @@ class LayoutSettingsViewModel @Inject constructor(
 
     fun onEvent(event: LayoutSettingsEvent) {
         when (event) {
+            is LayoutSettingsEvent.SetUiScalePercent -> viewModelScope.launch {
+                layoutPreferenceDataStore.setUiScalePercent(event.percent)
+            }
             is LayoutSettingsEvent.SelectLayout -> selectLayout(event.layout)
             is LayoutSettingsEvent.ToggleHeroCatalog -> toggleHeroCatalog(event.catalogKey)
             is LayoutSettingsEvent.SetSidebarCollapsed -> setSidebarCollapsed(event.collapsed)

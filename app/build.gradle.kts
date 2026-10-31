@@ -13,6 +13,92 @@ import com.android.build.gradle.internal.tasks.CompileArtProfileTask
 import com.android.build.gradle.internal.tasks.L8DexDesugarLibTask
 import java.io.File
 import java.util.Properties
+import groovy.json.JsonSlurper
+import java.net.HttpURLConnection
+import java.net.URI
+import java.nio.file.Files
+import java.nio.file.StandardCopyOption
+import java.security.MessageDigest
+
+abstract class DownloadNativeMpvTask : DefaultTask() {
+    @get:Input
+    abstract val artifactUrl: Property<String>
+
+    @get:Input
+    abstract val expectedSha256: Property<String>
+
+    @get:Input
+    abstract val offlineMode: Property<Boolean>
+
+    @get:OutputFile
+    abstract val artifactFile: RegularFileProperty
+
+    private fun sha256(file: File): String {
+        val digest = MessageDigest.getInstance("SHA-256")
+        file.inputStream().use { input ->
+            val buffer = ByteArray(64 * 1024)
+            var count = input.read(buffer)
+            while (count >= 0) {
+                digest.update(buffer, 0, count)
+                count = input.read(buffer)
+            }
+        }
+        return digest.digest().joinToString("") { "%02x".format(it.toInt() and 0xff) }
+    }
+
+    @TaskAction
+    fun download() {
+        val expected = expectedSha256.get()
+        require(expected.matches(Regex("[a-f0-9]{64}"))) { "Invalid pinned mpv SHA-256" }
+        val target = artifactFile.get().asFile
+        if (target.exists()) {
+            if (sha256(target) != expected) {
+                throw GradleException("Cached mpv AAR failed SHA-256 verification. Remove $target and retry.")
+            }
+            logger.lifecycle("Using verified cached mpv AAR")
+            return
+        }
+        if (offlineMode.get()) {
+            throw GradleException("Pinned mpv AAR is not cached. Run once without --offline.")
+        }
+        val uri = URI(artifactUrl.get())
+        require(uri.scheme == "https") { "The pinned mpv URL must use HTTPS" }
+        Files.createDirectories(target.toPath().parent)
+        val temporary = Files.createTempFile(target.toPath().parent, "mpv-", ".part")
+        val connection = uri.toURL().openConnection() as HttpURLConnection
+        try {
+            connection.connectTimeout = 30_000
+            connection.readTimeout = 120_000
+            connection.setRequestProperty("User-Agent", "NuvioTV-native-build")
+            if (connection.responseCode !in 200..299) {
+                throw GradleException("Could not download pinned mpv AAR: HTTP ${connection.responseCode}")
+            }
+            connection.inputStream.use { input ->
+                Files.newOutputStream(temporary).use { output -> input.copyTo(output) }
+            }
+            if (sha256(temporary.toFile()) != expected) {
+                throw GradleException("Downloaded mpv AAR failed SHA-256 verification")
+            }
+            Files.move(temporary, target.toPath(), StandardCopyOption.ATOMIC_MOVE, StandardCopyOption.REPLACE_EXISTING)
+            logger.lifecycle("Downloaded and verified pinned mpv AAR")
+        } finally {
+            connection.disconnect()
+            Files.deleteIfExists(temporary)
+        }
+    }
+}
+
+val nativeMpvPins = providers.fileContents(rootProject.layout.projectDirectory.file("native/mpv/pins.json"))
+    .asText.map { JsonSlurper().parseText(it) as Map<*, *> }
+val nativeMpvCache = gradle.gradleUserHomeDir.resolve("caches/nuvio-native")
+val downloadNativeMpv = tasks.register<DownloadNativeMpvTask>("downloadNativeMpv") {
+    artifactUrl.set(nativeMpvPins.map { it["prebuilt_aar_url"] as String })
+    expectedSha256.set(nativeMpvPins.map { it["prebuilt_aar_sha256"] as String })
+    offlineMode.set(gradle.startParameter.isOffline)
+    artifactFile.set(layout.file(expectedSha256.map { nativeMpvCache.resolve("$it/mpv-android-lib-nuviotv.aar") }))
+    // Validate cached bytes even when Gradle considers the output up to date.
+    outputs.upToDateWhen { false }
+}
 
 // Copies the per-API dex metadata (.dm) files AGP builds next to the binary ART profile into the APK's assets, so the
 // in-app updater can install the next version together with its profile and have it compiled at install time.
@@ -547,7 +633,7 @@ dependencies {
     implementation(files("libs/nuvio-libass-release.aar"))
     // Local nextlib-mediainfo fork (static FFmpeg; no libav*.so in final AAR)
     implementation(files("libs/nextlib-mediainfo-local.aar"))
-    implementation("io.github.abdallahmehiz:mpv-android-lib:0.1.12")
+    implementation(files(downloadNativeMpv.flatMap { it.artifactFile }).builtBy(downloadNativeMpv))
     implementation("dev.chrisbanes.haze:haze-android:1.7.2") {
         exclude(group = "org.jetbrains.compose.ui")
         exclude(group = "org.jetbrains.compose.foundation")

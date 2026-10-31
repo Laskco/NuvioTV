@@ -183,6 +183,8 @@ internal fun PlaybackSubtitlesSection(
         )
     }
 
+    if (!settings.usesExoPlayerEngine) return
+
     SettingsSectionLabel(text = stringResource(R.string.sub_advanced_section))
     SettingsToggleRow(
         title = stringResource(R.string.sub_libass),

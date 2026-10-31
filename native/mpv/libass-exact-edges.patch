@@ -1,0 +1,16 @@
+diff --git a/libass/ass_render.c b/libass/ass_render.c
+--- a/libass/ass_render.c
++++ b/libass/ass_render.c
+@@ -156,10 +156,8 @@ ASS_Renderer *ass_renderer_init(ASS_Library *library)
+ 
+     priv->library = library;
+     priv->ftlibrary = ft;
+-    const char *edges = getenv("LIBASS_EXPERIMENTAL_EDGES");
+-    priv->experimental_edges = edges && !strcmp(edges, "1");
+-    if (priv->experimental_edges)
+-        ass_msg(library, MSGL_INFO, "Experimental ASS edge processing enabled");
++    // Nuvio's mpv integration retains the original edge rasterization.
++    priv->experimental_edges = false;
+     // images_root and related stuff is zero-filled in calloc
+ 
+     unsigned flags = ASS_CPU_FLAG_ALL;

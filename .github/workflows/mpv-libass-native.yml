@@ -1,0 +1,66 @@
+name: Build mpv with pinned libass fork
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: mpv-libass-native-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  native:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 60
+    strategy:
+      fail-fast: false
+      matrix:
+        arch: [arm64, armv7l, x86, x86_64]
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/checkout@v6
+        with:
+          repository: abdallahmehiz/mpv-android
+          ref: 96c3507c5fc8eedbf5fff458101cad794392eca7
+          path: .native-mpv
+          persist-credentials: false
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools
+          log-accepted-android-sdk-licenses: false
+      - name: Install native toolchain
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y autoconf automake pkgconf libtool ninja-build gperf nasm
+          python3 -m pip install --break-system-packages meson
+          sdkmanager 'ndk;29.0.14206865'
+      - name: Rebuild mpv (${{ matrix.arch }})
+        run: bash native/mpv/build.sh '${{ matrix.arch }}'
+      - uses: actions/upload-artifact@v7
+        with:
+          name: mpv-libass-${{ matrix.arch }}
+          path: native-output/
+          if-no-files-found: error
+          retention-days: 7
+  package:
+    needs: native
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v6
+      - uses: actions/download-artifact@v8
+        with:
+          pattern: mpv-libass-*
+          path: native-output
+          merge-multiple: true
+      - name: Preserve wrapper and non-mpv libraries
+        run: python3 native/mpv/package.py
+      - uses: actions/upload-artifact@v7
+        with:
+          name: nuviotv-mpv-libass-aar
+          path: |
+            native-output/mpv-android-lib-nuviotv.aar
+            native-output/provenance.json
+          if-no-files-found: error
+          retention-days: 14

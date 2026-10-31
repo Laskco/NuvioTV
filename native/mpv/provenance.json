@@ -1,0 +1,18 @@
+{
+  "pins": {
+    "wrapper_repository": "abdallahmehiz/mpv-android",
+    "wrapper_commit": "96c3507c5fc8eedbf5fff458101cad794392eca7",
+    "base_aar_url": "https://repo.maven.apache.org/maven2/io/github/abdallahmehiz/mpv-android-lib/0.1.12/mpv-android-lib-0.1.12.aar",
+    "base_aar_sha256": "bb1a007c545cc7ac3304293ae79866b5361a48449ee7648c4030d5355869effc",
+    "libass_repository": "https://github.com/Laskco/mpvNova-libass.git",
+    "libass_commit": "59ffda5470fb052333336d0a782b56d55de41ab8",
+    "mpv_commit": "76a5eba991733f41310912c79c60f6c565a77cc9",
+    "libplacebo_commit": "b2ea27dceb6418aabfe9121174c6dbb232942998",
+    "dav1d_commit": "daef39627713a3e09873e78df65b268386cb4c20",
+    "ffmpeg_ref": "a7522f3fefa719be687f4627631ac6e5e481ef4c",
+    "gas_preprocessor_commit": "ac1836309c2e77023c228b7184485597286289d3",
+    "ndk_version": "29.0.14206865",
+    "experimental_edges": false
+  },
+  "aar_sha256": "c8d8c9036e1167a37d6e8944933fe01ed5133725c151376dcddb15e77cfa5f08"
+}
